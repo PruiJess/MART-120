@@ -1,0 +1,28 @@
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f0f0f0;
+}
+
+h2 {
+  color: rgb(63, 74, 241);
+}
+
+p {
+  line-height: 1.6;
+}
+
+/* Class selector affecting multiple tags */
+.section-style {
+  background-color: #e0e0ff;
+  padding: 10px;
+  border-left: 5px solid #3f4af1;
+}
+
+
+.secondpage-background {
+  background-image: url('ImageGallery/background.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
