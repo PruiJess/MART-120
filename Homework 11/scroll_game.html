@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Escape Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #222; }
+    canvas { display: block; margin: auto; background: #333; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="500" height="600"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const width = canvas.width;
+const height = canvas.height;
+
+// Player properties
+let player = { x: width / 2, y: height - 30, size: 20, speed: 5 };
+
+// Exit properties
+let exit = { x: Math.random() * (width - 80), y: 10, size: 80 };
+
+// Falling shapes
+let shapes = [];
+const shapeTypes = ["square", "circle", "triangle"];
+for (let i = 0; i < 12; i++) {
+  shapes.push({
+    x: Math.random() * width,
+    y: Math.random() * -height,
+    size: 20 + Math.random() * 30,
+    color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+    speed: 2 + Math.random() * 3,
+    type: shapeTypes[Math.floor(Math.random() * shapeTypes.length)]
+  });
+}
+
+// Two static obstacles from the start
+let staticObstacles = [
+  { x: 100, y: 300, size: 60, color: "blue" },
+  { x: 300, y: 400, size: 100, color: "orange" }
+];
+
+// Additional obstacle added on click
+let extraObstacle = null;
+
+// Keyboard input
+let keys = {};
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+// Mouse click adds one extra obstacle
+canvas.addEventListener("click", () => {
+  if (!extraObstacle) {
+    extraObstacle = { x: width / 2 - 40, y: height / 2, size: 80, color: "gray" };
+  }
+});
+
+// Collision helper
+function isColliding(a, b) {
+  return a.x < b.x + b.size &&
+         a.x + a.size > b.x &&
+         a.y < b.y + b.size &&
+         a.y + a.size > b.y;
+}
+
+function update() {
+  let newX = player.x;
+  let newY = player.y;
+
+  // Calculate intended movement
+  if (keys["ArrowLeft"]) newX -= player.speed;
+  if (keys["ArrowRight"]) newX += player.speed;
+  if (keys["ArrowUp"]) newY -= player.speed;
+  if (keys["ArrowDown"]) newY += player.speed;
+
+  // Wrap horizontally
+  if (newX < 0) newX = width;
+  if (newX > width) newX = 0;
+
+  // Prevent going off vertically
+  if (newY < 0) newY = 0;
+  if (newY > height) newY = height;
+
+  // Tentative position
+  let tempPlayer = { x: newX, y: newY, size: player.size };
+
+  // Check collisions with static obstacles and extra obstacle
+  let blockedByStatic = false;
+  staticObstacles.forEach(obs => {
+    if (isColliding(tempPlayer, obs)) blockedByStatic = true;
+  });
+  if (extraObstacle && isColliding(tempPlayer, extraObstacle)) blockedByStatic = true;
+
+  // Check collisions with falling shapes
+  let collidedWithShape = false;
+  shapes.forEach(shape => {
+    if (isColliding(tempPlayer, shape)) collidedWithShape = true;
+  });
+
+  if (!blockedByStatic && !collidedWithShape) {
+    // No collision → apply movement
+    player.x = newX;
+    player.y = newY;
+  } else if (blockedByStatic) {
+    // Block movement completely (safe zone)
+    // Do nothing → player stays in place
+  } else if (collidedWithShape) {
+    // Push down if collided with falling shape
+    player.y += player.speed;
+    if (player.y > height) player.y = height;
+  }
+
+  // Move shapes down
+  shapes.forEach(shape => {
+    shape.y += shape.speed;
+    if (shape.y > height) {
+      shape.y = -shape.size;
+      shape.x = Math.random() * width;
+      shape.type = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
+    }
+  });
+
+  // Check win condition
+  if (isColliding(player, exit)) {
+    alert("You escaped! You win!");
+    document.location.reload();
+  }
+}
+
+function drawShape(shape) {
+  ctx.fillStyle = shape.color;
+  if (shape.type === "square") {
+    ctx.fillRect(shape.x, shape.y, shape.size, shape.size);
+  } else if (shape.type === "circle") {
+    ctx.beginPath();
+    ctx.arc(shape.x + shape.size / 2, shape.y + shape.size / 2, shape.size / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (shape.type === "triangle") {
+    ctx.beginPath();
+    ctx.moveTo(shape.x + shape.size / 2, shape.y);
+    ctx.lineTo(shape.x, shape.y + shape.size);
+    ctx.lineTo(shape.x + shape.size, shape.y + shape.size);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, width, height);
+
+  // Draw exit with text
+  ctx.fillStyle = "lime";
+  ctx.fillRect(exit.x, exit.y, exit.size, exit.size);
+  ctx.fillStyle = "black";
+  ctx.font = "20px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("EXIT", exit.x + exit.size / 2, exit.y + exit.size / 2 + 7);
+
+  // Draw player
+  ctx.fillStyle = "white";
+  ctx.fillRect(player.x, player.y, player.size, player.size);
+
+  // Draw falling shapes
+  shapes.forEach(drawShape);
+
+  // Draw static obstacles
+  staticObstacles.forEach(obs => {
+    ctx.fillStyle = obs.color;
+    ctx.fillRect(obs.x, obs.y, obs.size, obs.size);
+  });
+
+  // Draw extra obstacle if exists
+  if (extraObstacle) {
+    ctx.fillStyle = extraObstacle.color;
+    ctx.fillRect(extraObstacle.x, extraObstacle.y, extraObstacle.size, extraObstacle.size);
+  }
+}
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
