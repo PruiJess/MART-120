@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Escape Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #222; }
+    canvas { display: block; margin: auto; background: #333; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="500" height="600"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const width = canvas.width;
+const height = canvas.height;
+
+let player;
+let clickObjects = [];
+let fallingObjects = [];
+let obstacles = [];
+let exitZone;
+let gameWon = false;
+let keys = {};
+let mouseX = 0, mouseY = 0;
+
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+canvas.addEventListener("mousemove", e => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = e.clientX - rect.left;
+  mouseY = e.clientY - rect.top;
+});
+canvas.addEventListener("click", () => drawObjectOnClick(mouseX, mouseY));
+
+// Collision helper
+function isColliding(a, b) {
+  return a.x < b.x + b.size &&
+         a.x + a.size > b.x &&
+         a.y < b.y + b.size &&
+         a.y + a.size > b.y;
+}
+
+// Create player
+function createPlayer() {
+  player = { x: width / 2, y: height - 40, size: 30, speed: 5, color: "white" };
+}
+
+// Move player with wrap and push-down on collision
+function movePlayer() {
+  let newX = player.x;
+  let newY = player.y;
+
+  if (keys["ArrowLeft"]) newX -= player.speed;
+  if (keys["ArrowRight"]) newX += player.speed;
+  if (keys["ArrowUp"]) newY -= player.speed;
+  if (keys["ArrowDown"]) newY += player.speed;
+
+  // Horizontal wrap
+  if (newX + player.size < 0) newX = width;
+  if (newX > width) newX = -player.size;
+
+  // Vertical bounds
+  if (newY < 0) newY = 0;
+  if (newY + player.size > height) newY = height - player.size;
+
+  let tempPlayer = { x: newX, y: newY, size: player.size };
+
+  // Check collision with clickObjects (block movement)
+  let blocked = false;
+  clickObjects.forEach(obj => {
+    if (isColliding(tempPlayer, obj)) blocked = true;
+  });
+
+  // Check collision with falling objects (push down)
+  let pushedDown = false;
+  fallingObjects.forEach(obj => {
+    if (isColliding(tempPlayer, obj)) pushedDown = true;
+  });
+
+  if (!blocked && !pushedDown) {
+    player.x = newX;
+    player.y = newY;
+  } else if (pushedDown) {
+    player.y += player.speed; // Push down
+    if (player.y + player.size > height) player.y = height - player.size;
+  }
+}
+
+// Draw player
+function drawPlayer() {
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.size, player.size);
+}
+
+// Draw object on mouse click
+function drawObjectOnClick(x, y) {
+  clickObjects.push({ x: x - 20, y: y - 20, size: 40, color: "purple" });
+}
+
+// Draw clicked objects
+function drawClickObjects() {
+  clickObjects.forEach(obj => {
+    ctx.fillStyle = obj.color;
+    ctx.fillRect(obj.x, obj.y, obj.size, obj.size);
+  });
+}
+
+// Create falling objects
+function createFallingObjects(num) {
+  for (let i = 0; i < num; i++) {
+    fallingObjects.push({
+      x: Math.random() * (width - 30),
+      y: Math.random() * -height,
+      size: 20 + Math.random() * 30,
+      color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+      speed: 2 + Math.random() * 3
+    });
+  }
+}
+
+// Move falling objects and block by clickObjects
+function moveFallingObjects() {
+  fallingObjects.forEach(obj => {
+    let canMove = true;
+
+    // Check if colliding with any clicked object
+    clickObjects.forEach(block => {
+      if (isColliding(obj, block)) {
+        canMove = false;
+      }
+    });
+
+    if (canMove) {
+      obj.y += obj.speed;
+    }
+
+    if (obj.y > height) {
+      obj.y = -obj.size;
+      obj.x = Math.random() * (width - obj.size);
+    }
+  });
+}
+
+// Draw falling objects
+function drawFallingObjects() {
+  fallingObjects.forEach(obj => {
+    ctx.fillStyle = obj.color;
+    ctx.beginPath();
+    ctx.arc(obj.x + obj.size / 2, obj.y + obj.size / 2, obj.size / 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+// Create obstacles
+function createObstacles() {
+  obstacles.push({ x: 100, y: 200, size: 50, color: "blue", dx: 2, dy: 1 });
+  obstacles.push({ x: 300, y: 400, size: 70, color: "orange", dx: -1, dy: 2 });
+}
+
+// Move obstacle 1
+function moveObstacle1() {
+  let obs = obstacles[0];
+  obs.x += obs.dx;
+  obs.y += obs.dy;
+  if (obs.x > width) obs.x = 0;
+  if (obs.x < 0) obs.x = width;
+  if (obs.y > height) obs.y = 0;
+  if (obs.y < 0) obs.y = height;
+}
+
+// Move obstacle 2
+function moveObstacle2() {
+  let obs = obstacles[1];
+  obs.x += obs.dx;
+  obs.y += obs.dy;
+  if (obs.x > width) obs.x = 0;
+  if (obs.x < 0) obs.x = width;
+  if (obs.y > height) obs.y = 0;
+  if (obs.y < 0) obs.y = height;
+}
+
+// Draw obstacles
+function drawObstacles() {
+  obstacles.forEach(obs => {
+    ctx.fillStyle = obs.color;
+    ctx.fillRect(obs.x, obs.y, obs.size, obs.size);
+  });
+}
+
+// Draw borders
+function drawBorders() {
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(0, 0, width, height);
+}
+
+// Create exit
+function createExit() {
+  exitZone = { x: width - 80, y: 20, size: 60, color: "lime" };
+}
+
+// Draw exit
+function drawExit() {
+  ctx.fillStyle = exitZone.color;
+  ctx.fillRect(exitZone.x, exitZone.y, exitZone.size, exitZone.size);
+  ctx.fillStyle = "black";
+  ctx.font = "20px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("EXIT", exitZone.x + exitZone.size / 2, exitZone.y + exitZone.size / 2 + 7);
+
+  if (isColliding(player, exitZone)) gameWon = true;
+}
+
+// Display win message
+function displayWinMessage() {
+  ctx.fillStyle = "yellow";
+  ctx.font = "40px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("YOU WIN!", width / 2, height / 2);
+}
+
+// Update game
+function update() {
+  if (!gameWon) {
+    movePlayer();
+    moveFallingObjects();
+    moveObstacle1();
+    moveObstacle2();
+  }
+}
+
+// Draw everything
+function draw() {
+  ctx.clearRect(0, 0, width, height);
+  drawBorders();
+  drawExit();
+  drawPlayer();
+  drawFallingObjects();
+  drawObstacles();
+  drawClickObjects();
+  if (gameWon) displayWinMessage();
+}
+
+// Game loop
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// Initialize
+createPlayer();
+createExit();
+createFallingObjects(10);
+createObstacles();
+gameLoop();
+</script>
+</body>
+</html>
